@@ -103,6 +103,19 @@ async def chat(model_id: str, request: ChatRequest):
         last_user_message = user_messages[-1].content
 
         # Log parameters (in a real implementation, these would be passed to the model)
+        
+@app.get("/api-key-test")
+async def test_api_key():
+    """Test if the Perplexity API key is properly set"""
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
+    
+    if not api_key:
+        return {"status": "error", "message": "No API key found"}
+    else:
+        # Only show first few characters for security
+        masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
+        return {"status": "success", "message": f"API key found: {masked_key}"}
+
         params = {
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
@@ -127,10 +140,64 @@ async def chat(model_id: str, request: ChatRequest):
         )
     else:
         print(f"Using Perplexity API key: {api_key[:5]}...")
-        # In a real implementation, you would call the Perplexity API here using the api_key
-        #  This is a placeholder. Replace with actual API call.
-        response = "Response from Perplexity API (placeholder)"
-        return ModelResponse(content=response, role=MessageRole.ASSISTANT, tool_calls=[])
+        # Make an actual call to the Perplexity API
+        import requests
+        
+        perplexity_url = "https://api.perplexity.ai/chat/completions"
+        
+        # Convert MCP messages to Perplexity format
+        perplexity_messages = [
+            {"role": msg.role.value, "content": msg.content} for msg in request.messages
+        ]
+        
+        # Prepare request payload
+        payload = {
+            "model": "mistral-7b-instruct", # Default model, you can map model_id to specific Perplexity models
+            "messages": perplexity_messages,
+            "max_tokens": request.max_tokens or 2048,
+            "temperature": request.temperature or 0.7,
+            "top_p": request.top_p or 1.0,
+            "top_k": request.top_k,
+            "presence_penalty": request.presence_penalty,
+            "frequency_penalty": request.frequency_penalty,
+            "stream": False  # We're not handling streaming yet
+        }
+        
+        # Remove None values
+        payload = {k: v for k, v in payload.items() if v is not None}
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = requests.post(perplexity_url, headers=headers, json=payload)
+            
+            if response.status_code == 200:
+                result = response.json()
+                assistant_message = result.get("choices", [{}])[0].get("message", {})
+                return ModelResponse(
+                    content=assistant_message.get("content", "No response from Perplexity"),
+                    role=MessageRole.ASSISTANT,
+                    tool_calls=[]  # You can handle tool calls if Perplexity supports them
+                )
+            else:
+                error_msg = f"Perplexity API error: {response.status_code} - {response.text}"
+                print(error_msg)
+                return ModelResponse(
+                    content=f"Error calling Perplexity API: {response.status_code}",
+                    role=MessageRole.ASSISTANT,
+                    tool_calls=[]
+                )
+        except Exception as e:
+            error_msg = f"Exception when calling Perplexity API: {str(e)}"
+            print(error_msg)
+            return ModelResponse(
+                content=f"Error: {str(e)}",
+                role=MessageRole.ASSISTANT,
+                tool_calls=[]
+            )
 
 
 @app.post("/v1/models/{model_id}/complete")
