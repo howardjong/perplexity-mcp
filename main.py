@@ -1,5 +1,7 @@
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import json
 from typing import Dict, List, Optional, Union, Any
 from fastapi import FastAPI, HTTPException, Request
@@ -106,6 +108,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/v1/models/{model_id}/chat")
 async def chat(model_id: str, request: ChatRequest):
+    print(f"[DEBUG] /v1/models/{model_id}/chat called with request: {request}")
     """Chat with the model"""
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
@@ -214,13 +217,11 @@ async def chat(model_id: str, request: ChatRequest):
         }
         
         try:
-            print(f"Sending request to Perplexity API: {perplexity_url}")
-            print(f"Request payload: {json.dumps(payload, indent=2)}")
-            
+            print(f"[DEBUG] Sending request to Perplexity API: {perplexity_url}")
+            print(f"[DEBUG] Request payload: {json.dumps(payload, indent=2)}")
             response = requests.post(perplexity_url, headers=headers, json=payload, timeout=120)
-            
-            print(f"Response status code: {response.status_code}")
-            
+            print(f"[DEBUG] Response status code: {response.status_code}")
+            print(f"[DEBUG] Response text: {response.text}")
             response.raise_for_status()  # Raise HTTPError for bad responses
             
             result = response.json()
@@ -245,6 +246,7 @@ async def chat(model_id: str, request: ChatRequest):
                 print("WARNING: 'content' field is null or missing in the Perplexity API message.")
                 content = ""  # Set empty content if null
             
+            print(f"[DEBUG] Returning response from Perplexity API: {content}")
             return ModelResponse(
                 content=content,
                 role=MessageRole.ASSISTANT,
