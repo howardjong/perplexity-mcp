@@ -52,6 +52,7 @@ async def list_models():
 async def get_model(model_id: str):
     """Get model information"""
     if model_id not in MODEL_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
 @app.get("/api-key-test")
 async def test_api_key():
@@ -64,8 +65,6 @@ async def test_api_key():
         # Only show first few characters for security
         masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
         return {"status": "success", "message": f"API key found: {masked_key}"}
-
-        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
     config = MODEL_REGISTRY[model_id]
     return {
@@ -269,6 +268,23 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
 
+@app.get("/server-info")
+async def server_info():
+    """Server information endpoint"""
+    import socket
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    # Get the port from the current server
+    port = 5003  # Based on the console output
+    return {
+        "status": "running",
+        "hostname": hostname,
+        "local_ip": local_ip,
+        "server_port": port,
+        "external_port_mapping": "5003 -> 3002",
+        "api_key_configured": bool(os.environ.get("PERPLEXITY_API_KEY"))
+    }
+
 if __name__ == "__main__":
     import uvicorn
     import socket
@@ -295,8 +311,6 @@ if __name__ == "__main__":
 
     print(f"Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-@app.get("/server-info")
 async def server_info():
     """Server information endpoint"""
     import socket
