@@ -52,6 +52,19 @@ async def list_models():
 async def get_model(model_id: str):
     """Get model information"""
     if model_id not in MODEL_REGISTRY:
+
+@app.get("/api-key-test")
+async def test_api_key():
+    """Test if the Perplexity API key is properly set"""
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
+    
+    if not api_key:
+        return {"status": "error", "message": "No API key found"}
+    else:
+        # Only show first few characters for security
+        masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
+        return {"status": "success", "message": f"API key found: {masked_key}"}
+
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
     config = MODEL_REGISTRY[model_id]
@@ -102,20 +115,7 @@ async def chat(model_id: str, request: ChatRequest):
 
         last_user_message = user_messages[-1].content
 
-        # Log parameters (in a real implementation, these would be passed to the model)
-        
-@app.get("/api-key-test")
-async def test_api_key():
-    """Test if the Perplexity API key is properly set"""
-    api_key = os.environ.get("PERPLEXITY_API_KEY")
-    
-    if not api_key:
-        return {"status": "error", "message": "No API key found"}
-    else:
-        # Only show first few characters for security
-        masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
-        return {"status": "success", "message": f"API key found: {masked_key}"}
-
+        # Log parameters for demo implementation
         params = {
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
@@ -138,11 +138,11 @@ async def test_api_key():
             role=MessageRole.ASSISTANT,
             tool_calls=[]
         )
-
-    # This is the path with the API key
-    print(f"Using Perplexity API key: {api_key[:5]}...")
-    # Make an actual call to the Perplexity API
-    import requests
+    else:
+        # This is the path with the API key
+        print(f"Using Perplexity API key: {api_key[:5]}...")
+        # Make an actual call to the Perplexity API
+        import requests
     
     perplexity_url = "https://api.perplexity.ai/chat/completions"
     
@@ -295,3 +295,20 @@ if __name__ == "__main__":
 
     print(f"Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+@app.get("/server-info")
+async def server_info():
+    """Server information endpoint"""
+    import socket
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    # Get the port from the current server
+    port = 5003  # Based on the console output
+    return {
+        "status": "running",
+        "hostname": hostname,
+        "local_ip": local_ip,
+        "server_port": port,
+        "external_port_mapping": "5003 -> 3002",
+        "api_key_configured": bool(os.environ.get("PERPLEXITY_API_KEY"))
+    }
