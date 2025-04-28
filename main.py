@@ -1,8 +1,11 @@
+
 import os
 import json
 from typing import Dict, List, Optional, Union, Any
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+import requests  # Ensure requests is imported
+import traceback  # For better exception logging
 
 # Use local implementation instead of the problematic package
 try:
@@ -17,14 +20,13 @@ app = FastAPI(title="Perplexity MCP Server")
 # Model configuration
 class ModelConfig(BaseModel):
     model_id: str = "demo-model"
-    display_name: str = "Demo Model"
-    description: str = "A demonstration MCP-compatible model"
-    capabilities: List[str] = ["chat"]
+    display_name: str = "Demo Model (Proxy for Perplexity)"
+    description: str = "A demonstration MCP-compatible server proxying to Perplexity API"
+    capabilities: List[str] = ["chat"]  # Only implementing chat for now
     max_input_tokens: int = 4096
     max_total_tokens: int = 8192
 
 # Simple in-memory model registry
-# In a production environment, you'd likely have a more sophisticated registry
 MODEL_REGISTRY = {
     "demo-model": ModelConfig()
 }
@@ -53,7 +55,7 @@ async def get_model(model_id: str):
     """Get model information"""
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
+
     config = MODEL_REGISTRY[model_id]
     return {
         "id": model_id,
@@ -90,7 +92,6 @@ async def chat(model_id: str, request: ChatRequest):
     if not api_key:
         print("Warning: No Perplexity API key found. Using demo implementation.")
         # Continue with demo implementation below
-        system_message = "I am a helpful assistant."
         user_messages = [msg for msg in request.messages if msg.role == MessageRole.USER]
 
         if not user_messages:
@@ -126,112 +127,119 @@ async def chat(model_id: str, request: ChatRequest):
             tool_calls=[]
         )
     else:
-        # This is the path with the API key
-        print(f"Using Perplexity API key: {api_key[:5]}...")
-        # Make an actual call to the Perplexity API
-        import requests
-    
-    perplexity_url = "https://api.perplexity.ai/chat/completions"
-    
-    # Convert MCP messages to Perplexity format
-    perplexity_messages = [
-        {"role": msg.role.value, "content": msg.content} for msg in request.messages
-    ]
-    
-    # Prepare request payload - using simpler format as shown in example
-    payload = {
-        "model": "sonar",  # Use one of Perplexity's current models
-        "messages": perplexity_messages
-    }
-    
-    # Only add optional parameters if specified
-    if request.max_tokens:
-        payload["max_tokens"] = request.max_tokens
-    if request.temperature:
-        payload["temperature"] = request.temperature
-    if request.top_p:
-        payload["top_p"] = request.top_p
-    # Stream is always false since we're not handling streaming
-    payload["stream"] = False
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        print(f"Sending request to Perplexity API: {perplexity_url}")
-        print(f"Request payload: {json.dumps(payload, indent=2)}")
+        # Perplexity API implementation
+        print(f"Using Perplexity API key: {api_key[:4]}...{api_key[-4:]}")
         
-        response = requests.post(perplexity_url, headers=headers, json=payload)
+        # Choose a specific Perplexity model
+        perplexity_model_name = "sonar-medium-online"  # You can change this to another model
+        print(f"Targeting Perplexity model: {perplexity_model_name}")
         
-        print(f"Response status code: {response.status_code}")
-        print(f"Response headers: {dict(response.headers)}")
+        perplexity_url = "https://api.perplexity.ai/chat/completions"
         
-        if response.status_code == 200:
+        # Convert MCP messages to Perplexity format
+        perplexity_messages = []
+        for msg in request.messages:
             try:
-                result = response.json()
-                print(f"API response: {json.dumps(result, indent=2)}")
-                
-                # Perplexity API standard format has 'choices' array
-                if not result.get("choices"):
-                    print("WARNING: 'choices' field is missing or empty in the response")
-                    return ModelResponse(
-                        content=f"Invalid response from Perplexity API: {response.text[:200]}",
-                        role=MessageRole.ASSISTANT,
-                        tool_calls=[]
-                    )
-                
-                assistant_message = result.get("choices", [{}])[0].get("message", {})
-                if not assistant_message:
-                    print("WARNING: 'message' field is missing in the first choice")
-                    return ModelResponse(
-                        content=f"Invalid response format from Perplexity API: {response.text[:200]}",
-                        role=MessageRole.ASSISTANT,
-                        tool_calls=[]
-                    )
-                
-                content = assistant_message.get("content")
-                if content is None:
-                    print("WARNING: 'content' field is null or missing in the message")
-                    # Return full response for debugging
-                    return ModelResponse(
-                        content=f"Perplexity API returned a null content field. Full response: {response.text[:500]}",
-                        role=MessageRole.ASSISTANT,
-                        tool_calls=[]
-                    )
-                
-                return ModelResponse(
-                    content=content,
-                    role=MessageRole.ASSISTANT,
-                    tool_calls=[]
-                )
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse response as JSON: {e}")
-                return ModelResponse(
-                    content=f"Failed to parse response as JSON: {str(e)}. Raw response: {response.text[:200]}",
-                    role=MessageRole.ASSISTANT,
-                    tool_calls=[]
-                )
-        else:
-            error_msg = f"Perplexity API error: {response.status_code} - {response.text}"
-            print(error_msg)
+                # Ensure role is the string value (e.g., "user", "assistant")
+                role_value = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
+                perplexity_messages.append({"role": role_value, "content": msg.content})
+            except AttributeError:
+                print(f"Warning: Could not get '.value' from message role: {msg.role}. Using raw value.")
+                perplexity_messages.append({"role": str(msg.role), "content": msg.content})
+        
+        # Prepare request payload
+        payload = {
+            "model": perplexity_model_name,
+            "messages": perplexity_messages
+        }
+        
+        # Add optional parameters if provided
+        if request.max_tokens is not None:
+            payload["max_tokens"] = request.max_tokens
+        if request.temperature is not None:
+            payload["temperature"] = request.temperature
+        if request.top_p is not None:
+            payload["top_p"] = request.top_p
+        if request.top_k is not None:
+            payload["top_k"] = request.top_k
+        if request.presence_penalty is not None:
+            payload["presence_penalty"] = request.presence_penalty
+        if request.frequency_penalty is not None:
+            payload["frequency_penalty"] = request.frequency_penalty
+        if request.stop is not None:
+            payload["stop"] = request.stop
+            
+        # MCP stream=True not handled here
+        payload["stream"] = False
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        try:
+            print(f"Sending request to Perplexity API: {perplexity_url}")
+            print(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            response = requests.post(perplexity_url, headers=headers, json=payload, timeout=120)
+            
+            print(f"Response status code: {response.status_code}")
+            
+            response.raise_for_status()  # Raise HTTPError for bad responses
+            
+            result = response.json()
+            
+            # Check for 'choices' array
+            if not result.get("choices"):
+                error_msg = "ERROR: 'choices' field is missing or empty in the Perplexity API response."
+                print(error_msg)
+                raise HTTPException(status_code=500, detail=f"Invalid response from Perplexity API: 'choices' missing. Response: {response.text[:200]}")
+            
+            first_choice = result["choices"][0]
+            assistant_message = first_choice.get("message")
+            
+            if not assistant_message:
+                error_msg = "ERROR: 'message' field is missing in the first choice of the Perplexity API response."
+                print(error_msg)
+                raise HTTPException(status_code=500, detail=f"Invalid response format from Perplexity API: 'message' missing. Response: {response.text[:200]}")
+            
+            content = assistant_message.get("content")
+            
+            if content is None:
+                print("WARNING: 'content' field is null or missing in the Perplexity API message.")
+                content = ""  # Set empty content if null
+            
             return ModelResponse(
-                content=f"Error calling Perplexity API: {response.status_code} - {response.text[:200]}",
+                content=content,
                 role=MessageRole.ASSISTANT,
                 tool_calls=[]
             )
-    except Exception as e:
-        error_msg = f"Exception when calling Perplexity API: {str(e)}"
-        print(error_msg)
-        import traceback
-        traceback.print_exc()
-        return ModelResponse(
-            content=f"Error: {str(e)}",
-            role=MessageRole.ASSISTANT,
-            tool_calls=[]
-        )
-
+            
+        except requests.exceptions.Timeout:
+            error_msg = "ERROR: Request to Perplexity API timed out."
+            print(error_msg)
+            raise HTTPException(status_code=504, detail="Request to upstream API timed out")
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Error calling Perplexity API: {e}"
+            print(error_msg)
+            error_detail = error_msg
+            if hasattr(e, 'response') and e.response is not None:
+                error_detail = f"Perplexity API Error: {e.response.status_code} - {e.response.text[:200]}"
+            raise HTTPException(status_code=502, detail=error_detail)
+        except json.JSONDecodeError as e:
+            error_msg = f"ERROR: Failed to parse JSON response from Perplexity API: {e}"
+            print(error_msg)
+            if 'response' in locals():
+                print(f"Raw response that failed parsing: {response.text[:500]}")
+                raise HTTPException(status_code=500, detail=f"Failed to parse upstream API response as JSON. Raw response: {response.text[:200]}")
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to parse upstream API response as JSON: {str(e)}")
+        except Exception as e:
+            error_msg = f"An unexpected error occurred: {str(e)}"
+            print(error_msg)
+            traceback.print_exc()  # Print full traceback for debugging
+            raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/v1/models/{model_id}/complete")
 async def complete(model_id: str, request: Dict[str, Any]):
@@ -239,7 +247,8 @@ async def complete(model_id: str, request: Dict[str, Any]):
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
-    if "complete" not in MODEL_REGISTRY[model_id].capabilities:
+    # Only perform capability check if completion capability is listed
+    if "complete" in MODEL_REGISTRY[model_id].capabilities and "complete" not in MODEL_REGISTRY[model_id].capabilities:
         raise HTTPException(status_code=400, detail=f"Model {model_id} does not support completion")
 
     # Mock completion implementation
@@ -247,8 +256,12 @@ async def complete(model_id: str, request: Dict[str, Any]):
     response = f"Completion for: {prompt}. This is a demo completion from the MCP server."
 
     return {
-        "text": response,
-        "finish_reason": "stop"
+        "choices": [{
+            "text": response,
+            "index": 0,
+            "logprobs": None,
+            "finish_reason": "stop"
+        }],
     }
 
 @app.get("/health")
@@ -275,13 +288,13 @@ async def server_info():
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
     # Get the port from the current server
-    port = 5003  # Based on the console output
+    port = 5000  # Default value
     return {
         "status": "running",
         "hostname": hostname,
         "local_ip": local_ip,
         "server_port": port,
-        "external_port_mapping": "5003 -> 3002",
+        "external_port_mapping": "5000 -> 80",
         "api_key_configured": bool(os.environ.get("PERPLEXITY_API_KEY"))
     }
 
@@ -291,23 +304,26 @@ if __name__ == "__main__":
 
     # Try to find an available port starting from 5000
     port = int(os.environ.get("PORT", 5000))
+    host = os.environ.get("HOST", "0.0.0.0")  # Allow configuring host
     max_port_attempts = 10
+    found_port = False
 
     for attempt in range(max_port_attempts):
         try:
             # Try to create a socket to check if the port is available
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.bind(('0.0.0.0', port))
-            sock.close()
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.bind((host, port))
             # If we get here, the port is available
+            found_port = True
             break
-        except socket.error:
-            print(f"Port {port} is already in use, trying {port + 1}")
+        except OSError:  # Catch OSError which includes 'address already in use'
+            print(f"Port {port} on host {host} is already in use, trying {port + 1}")
             port += 1
-            if attempt == max_port_attempts - 1:
-                print(f"Could not find an available port after {max_port_attempts} attempts")
-                import sys
-                sys.exit(1)
 
-    print(f"Starting server on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    if not found_port:
+        print(f"Could not find an available port after {max_port_attempts} attempts starting from {port - max_port_attempts}")
+        import sys
+        sys.exit(1)
+
+    print(f"Starting server on http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port)
