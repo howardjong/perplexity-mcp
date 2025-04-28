@@ -173,27 +173,53 @@ async def test_api_key():
     }
     
     try:
+        print(f"Sending request to Perplexity API: {perplexity_url}")
+        print(f"Request payload: {json.dumps(payload, indent=2)}")
+        
         response = requests.post(perplexity_url, headers=headers, json=payload)
+        
+        print(f"Response status code: {response.status_code}")
+        print(f"Response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
             result = response.json()
+            print(f"API response: {json.dumps(result, indent=2)}")
+            
+            if not result.get("choices"):
+                print("WARNING: 'choices' field is missing or empty in the response")
+                return ModelResponse(
+                    content="Invalid response from Perplexity API: 'choices' field missing",
+                    role=MessageRole.ASSISTANT,
+                    tool_calls=[]
+                )
+                
             assistant_message = result.get("choices", [{}])[0].get("message", {})
+            if not assistant_message:
+                print("WARNING: 'message' field is missing in the first choice")
+            
+            content = assistant_message.get("content")
+            if content is None:
+                print("WARNING: 'content' field is null or missing in the message")
+                content = "No content returned from Perplexity API (null response)"
+                
             return ModelResponse(
-                content=assistant_message.get("content", "No response from Perplexity"),
+                content=content,
                 role=MessageRole.ASSISTANT,
-                tool_calls=[]  # You can handle tool calls if Perplexity supports them
+                tool_calls=[]
             )
         else:
             error_msg = f"Perplexity API error: {response.status_code} - {response.text}"
             print(error_msg)
             return ModelResponse(
-                content=f"Error calling Perplexity API: {response.status_code}",
+                content=f"Error calling Perplexity API: {response.status_code} - {response.text[:200]}",
                 role=MessageRole.ASSISTANT,
                 tool_calls=[]
             )
     except Exception as e:
         error_msg = f"Exception when calling Perplexity API: {str(e)}"
         print(error_msg)
+        import traceback
+        traceback.print_exc()
         return ModelResponse(
             content=f"Error: {str(e)}",
             role=MessageRole.ASSISTANT,
