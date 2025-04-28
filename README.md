@@ -21,15 +21,50 @@ This is a Python implementation of the Model Context Protocol (MCP) server for P
 
 ### Locally
 
-```bash
-python main.py
-```
+1. Create a `.env` file in the project root with your Perplexity API key:
+   ```env
+   PERPLEXITY_API_KEY=your_actual_key_here
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Start the server:
+   ```bash
+   python main.py
+   ```
+The server will start on http://0.0.0.0:5000 (or the next available port).
 
-The server will start on http://0.0.0.0:5000
+### Docker Deployment
 
-### Deployment on Replit
+1. Build the Docker image:
+   ```bash
+   docker build -t perplexity-mcp .
+   ```
+2. Run the container, passing your `.env` file:
+   ```bash
+   docker run --env-file .env -p 5003:5000 perplexity-mcp
+   ```
+   - The API will be available at http://localhost:5003
+   - You can use any available port on your host (replace 5003 as needed)
 
-This server is configured to be deployed on Replit. The deployment will use the main.py file as the entry point.
+**Note:**
+- `.env` is included in `.gitignore` and `.dockerignore` to keep your API key secure.
+- Never commit your `.env` file to GitHub.
+
+### Render Deployment
+
+Render can automatically build and deploy this project from GitHub using the included Dockerfile.
+
+1. Push your code to GitHub.
+2. In the Render dashboard, create a new Web Service:
+   - Select "Docker" as the environment.
+   - Connect your GitHub repo and select the branch (e.g., `main`).
+   - Set your environment variable `PERPLEXITY_API_KEY` in the Render dashboard (Settings > Environment).
+   - Choose your desired port (default is 5000).
+3. Deploy! Render will build and run your Docker container.
+
+**Security:** Do not rely on `.env` in the repo for Render. Always set secrets in the Render dashboard.
 
 ## API Documentation
 
