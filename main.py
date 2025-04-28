@@ -151,21 +151,21 @@ async def test_api_key():
         {"role": msg.role.value, "content": msg.content} for msg in request.messages
     ]
     
-    # Prepare request payload
+    # Prepare request payload - using simpler format as shown in example
     payload = {
-        "model": "mistral-7b-instruct", # Default model, you can map model_id to specific Perplexity models
-        "messages": perplexity_messages,
-        "max_tokens": request.max_tokens or 2048,
-        "temperature": request.temperature or 0.7,
-        "top_p": request.top_p or 1.0,
-        "top_k": request.top_k,
-        "presence_penalty": request.presence_penalty,
-        "frequency_penalty": request.frequency_penalty,
-        "stream": False  # We're not handling streaming yet
+        "model": "sonar",  # Use one of Perplexity's current models
+        "messages": perplexity_messages
     }
     
-    # Remove None values
-    payload = {k: v for k, v in payload.items() if v is not None}
+    # Only add optional parameters if specified
+    if request.max_tokens:
+        payload["max_tokens"] = request.max_tokens
+    if request.temperature:
+        payload["temperature"] = request.temperature
+    if request.top_p:
+        payload["top_p"] = request.top_p
+    # Stream is always false since we're not handling streaming
+    payload["stream"] = False
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -182,31 +182,50 @@ async def test_api_key():
         print(f"Response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
-            result = response.json()
-            print(f"API response: {json.dumps(result, indent=2)}")
-            
-            if not result.get("choices"):
-                print("WARNING: 'choices' field is missing or empty in the response")
+            try:
+                result = response.json()
+                print(f"API response: {json.dumps(result, indent=2)}")
+                
+                # Perplexity API standard format has 'choices' array
+                if not result.get("choices"):
+                    print("WARNING: 'choices' field is missing or empty in the response")
+                    return ModelResponse(
+                        content=f"Invalid response from Perplexity API: {response.text[:200]}",
+                        role=MessageRole.ASSISTANT,
+                        tool_calls=[]
+                    )
+                
+                assistant_message = result.get("choices", [{}])[0].get("message", {})
+                if not assistant_message:
+                    print("WARNING: 'message' field is missing in the first choice")
+                    return ModelResponse(
+                        content=f"Invalid response format from Perplexity API: {response.text[:200]}",
+                        role=MessageRole.ASSISTANT,
+                        tool_calls=[]
+                    )
+                
+                content = assistant_message.get("content")
+                if content is None:
+                    print("WARNING: 'content' field is null or missing in the message")
+                    # Return full response for debugging
+                    return ModelResponse(
+                        content=f"Perplexity API returned a null content field. Full response: {response.text[:500]}",
+                        role=MessageRole.ASSISTANT,
+                        tool_calls=[]
+                    )
+                
                 return ModelResponse(
-                    content="Invalid response from Perplexity API: 'choices' field missing",
+                    content=content,
                     role=MessageRole.ASSISTANT,
                     tool_calls=[]
                 )
-                
-            assistant_message = result.get("choices", [{}])[0].get("message", {})
-            if not assistant_message:
-                print("WARNING: 'message' field is missing in the first choice")
-            
-            content = assistant_message.get("content")
-            if content is None:
-                print("WARNING: 'content' field is null or missing in the message")
-                content = "No content returned from Perplexity API (null response)"
-                
-            return ModelResponse(
-                content=content,
-                role=MessageRole.ASSISTANT,
-                tool_calls=[]
-            )
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse response as JSON: {e}")
+                return ModelResponse(
+                    content=f"Failed to parse response as JSON: {str(e)}. Raw response: {response.text[:200]}",
+                    role=MessageRole.ASSISTANT,
+                    tool_calls=[]
+                )
         else:
             error_msg = f"Perplexity API error: {response.status_code} - {response.text}"
             print(error_msg)
