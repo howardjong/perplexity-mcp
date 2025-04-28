@@ -38,3 +38,18 @@ The server includes a simple in-memory model registry. In a production environme
 ## Adding Your Own Models
 
 To add your own models, update the `MODEL_REGISTRY` dictionary in main.py with your model configurations.
+
+## Supported Model Parameters
+
+The chat endpoint supports the following parameters from the Perplexity API:
+
+- `max_tokens`: Maximum number of tokens to generate
+- `temperature`: Sampling temperature between 0 and 2
+- `top_p`: Nucleus sampling parameter between 0 and 1
+- `top_k`: Top-k sampling parameter
+- `presence_penalty`: Presence penalty between -2 and 2
+- `frequency_penalty`: Frequency penalty between -2 and 2
+- `stop`: Stop sequences that cause the model to stop generating
+- `repetition_penalty`: Repetition penalty for token generation
+- `logprobs`: Whether to return log probabilities of the output tokens
+- `stream`: Whether to stream the response

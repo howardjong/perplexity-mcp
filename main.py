@@ -61,9 +61,15 @@ async def get_model(model_id: str):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     stream: bool = False
-    max_tokens: Optional[int] = None
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
+    max_tokens: Optional[int] = Field(default=None, description="Maximum number of tokens to generate")
+    temperature: Optional[float] = Field(default=None, description="Sampling temperature between 0 and 2")
+    top_p: Optional[float] = Field(default=None, description="Nucleus sampling parameter between 0 and 1")
+    top_k: Optional[int] = Field(default=None, description="Top-k sampling parameter")
+    presence_penalty: Optional[float] = Field(default=None, description="Presence penalty between -2 and 2")
+    frequency_penalty: Optional[float] = Field(default=None, description="Frequency penalty between -2 and 2")
+    stop: Optional[Union[str, List[str]]] = Field(default=None, description="Stop sequences that cause the model to stop generating")
+    repetition_penalty: Optional[float] = Field(default=None, description="Repetition penalty for token generation")
+    logprobs: Optional[bool] = Field(default=None, description="Whether to return log probabilities of the output tokens")
     tool_results: Optional[List[ToolResult]] = None
 
 @app.post("/v1/models/{model_id}/chat")
@@ -73,7 +79,7 @@ async def chat(model_id: str, request: ChatRequest):
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
     
     # Mock response generation
-    # In a real implementation, you would call your model here
+    # In a real implementation, you would call your model here with all parameters
     system_message = "I am a helpful assistant."
     user_messages = [msg for msg in request.messages if msg.role == MessageRole.USER]
     
@@ -85,6 +91,21 @@ async def chat(model_id: str, request: ChatRequest):
         )
     
     last_user_message = user_messages[-1].content
+    
+    # Log parameters (in a real implementation, these would be passed to the model)
+    params = {
+        "max_tokens": request.max_tokens,
+        "temperature": request.temperature,
+        "top_p": request.top_p,
+        "top_k": request.top_k,
+        "presence_penalty": request.presence_penalty,
+        "frequency_penalty": request.frequency_penalty,
+        "stop": request.stop,
+        "repetition_penalty": request.repetition_penalty,
+        "logprobs": request.logprobs,
+        "stream": request.stream
+    }
+    print(f"Model parameters: {params}")
     
     # Simple demo response
     response = f"You said: {last_user_message}. This is a demo response from the MCP server."
