@@ -84,43 +84,54 @@ async def chat(model_id: str, request: ChatRequest):
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
-    # Mock response generation
-    # In a real implementation, you would call your model here with all parameters
-    system_message = "I am a helpful assistant."
-    user_messages = [msg for msg in request.messages if msg.role == MessageRole.USER]
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
 
-    if not user_messages:
+    # Check if API key is available (when connecting to actual Perplexity API)
+    if not api_key:
+        print("Warning: No Perplexity API key found. Using demo implementation.")
+        # Continue with demo implementation below
+        system_message = "I am a helpful assistant."
+        user_messages = [msg for msg in request.messages if msg.role == MessageRole.USER]
+
+        if not user_messages:
+            return ModelResponse(
+                content="I don't see any user messages. How can I help you today?",
+                role=MessageRole.ASSISTANT,
+                tool_calls=[]
+            )
+
+        last_user_message = user_messages[-1].content
+
+        # Log parameters (in a real implementation, these would be passed to the model)
+        params = {
+            "max_tokens": request.max_tokens,
+            "temperature": request.temperature,
+            "top_p": request.top_p,
+            "top_k": request.top_k,
+            "presence_penalty": request.presence_penalty,
+            "frequency_penalty": request.frequency_penalty,
+            "stop": request.stop,
+            "repetition_penalty": request.repetition_penalty,
+            "logprobs": request.logprobs,
+            "stream": request.stream
+        }
+        print(f"Model parameters: {params}")
+
+        # Simple demo response
+        response = f"You said: {last_user_message}. This is a demo response from the MCP server."
+
         return ModelResponse(
-            content="I don't see any user messages. How can I help you today?",
+            content=response,
             role=MessageRole.ASSISTANT,
             tool_calls=[]
         )
+    else:
+        print(f"Using Perplexity API key: {api_key[:5]}...")
+        # In a real implementation, you would call the Perplexity API here using the api_key
+        #  This is a placeholder. Replace with actual API call.
+        response = "Response from Perplexity API (placeholder)"
+        return ModelResponse(content=response, role=MessageRole.ASSISTANT, tool_calls=[])
 
-    last_user_message = user_messages[-1].content
-
-    # Log parameters (in a real implementation, these would be passed to the model)
-    params = {
-        "max_tokens": request.max_tokens,
-        "temperature": request.temperature,
-        "top_p": request.top_p,
-        "top_k": request.top_k,
-        "presence_penalty": request.presence_penalty,
-        "frequency_penalty": request.frequency_penalty,
-        "stop": request.stop,
-        "repetition_penalty": request.repetition_penalty,
-        "logprobs": request.logprobs,
-        "stream": request.stream
-    }
-    print(f"Model parameters: {params}")
-
-    # Simple demo response
-    response = f"You said: {last_user_message}. This is a demo response from the MCP server."
-
-    return ModelResponse(
-        content=response,
-        role=MessageRole.ASSISTANT,
-        tool_calls=[]
-    )
 
 @app.post("/v1/models/{model_id}/complete")
 async def complete(model_id: str, request: Dict[str, Any]):
@@ -148,11 +159,11 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     import socket
-    
+
     # Try to find an available port starting from 5000
     port = int(os.environ.get("PORT", 5000))
     max_port_attempts = 10
-    
+
     for attempt in range(max_port_attempts):
         try:
             # Try to create a socket to check if the port is available
@@ -168,6 +179,6 @@ if __name__ == "__main__":
                 print(f"Could not find an available port after {max_port_attempts} attempts")
                 import sys
                 sys.exit(1)
-    
+
     print(f"Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
