@@ -28,7 +28,27 @@ class ModelConfig(BaseModel):
 
 # Simple in-memory model registry
 MODEL_REGISTRY = {
-    "demo-model": ModelConfig()
+    "demo-model": ModelConfig(),
+    "sonar": ModelConfig(
+        model_id="sonar",
+        display_name="Perplexity Sonar",
+        description="Perplexity's flagship model with strong reasoning"
+    ),
+    "sonar-pro": ModelConfig(
+        model_id="sonar-pro",
+        display_name="Perplexity Sonar Pro",
+        description="Pro version of Sonar with enhanced capabilities"
+    ),
+    "sonar-deep-research": ModelConfig(
+        model_id="sonar-deep-research",
+        display_name="Perplexity Sonar Deep Research",
+        description="Specialized for in-depth research tasks"
+    ),
+    "sonar-reasoning-pro": ModelConfig(
+        model_id="sonar-reasoning-pro",
+        display_name="Perplexity Sonar Reasoning Pro",
+        description="Advanced reasoning capabilities with enhanced logic"
+    )
 }
 
 @app.get("/")
@@ -134,8 +154,19 @@ async def chat(model_id: str, request: ChatRequest):
         # Perplexity API implementation
         print(f"Using Perplexity API key: {api_key[:4]}...{api_key[-4:]}")
         
-        # Choose a specific Perplexity model
-        perplexity_model_name = "sonar"  # You can change this to another model
+        # Use the model ID from the request path if it starts with "sonar" or is one of the known Perplexity models
+        perplexity_models = ["sonar", "sonar-small", "sonar-medium", "sonar-pro", 
+                            "sonar-deep-research", "sonar-reasoning-pro", 
+                            "codellama-70b", "mixtral-8x7b", "mistral-7b"]
+        
+        if model_id in perplexity_models:
+            perplexity_model_name = model_id
+        elif model_id.startswith("sonar-"):  # Allow any model that starts with sonar-
+            perplexity_model_name = model_id
+        else:
+            # Default to sonar if the requested model is not recognized
+            perplexity_model_name = "sonar"
+            
         print(f"Targeting Perplexity model: {perplexity_model_name}")
         
         perplexity_url = "https://api.perplexity.ai/chat/completions"
@@ -300,6 +331,9 @@ async def list_perplexity_models():
         {"id": "sonar", "description": "Perplexity's flagship model with strong reasoning"},
         {"id": "sonar-small", "description": "Smaller, faster version of Sonar"},
         {"id": "sonar-medium", "description": "Medium-sized version of Sonar"},
+        {"id": "sonar-pro", "description": "Pro version of Sonar with enhanced capabilities"},
+        {"id": "sonar-deep-research", "description": "Specialized for in-depth research tasks"},
+        {"id": "sonar-reasoning-pro", "description": "Advanced reasoning capabilities with enhanced logic"},
         {"id": "codellama-70b", "description": "Specialized for code generation"},
         {"id": "mixtral-8x7b", "description": "From Mistral AI, good for general tasks"},
         {"id": "mistral-7b", "description": "Fast and efficient model from Mistral AI"}

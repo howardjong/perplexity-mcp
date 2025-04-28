@@ -43,6 +43,22 @@ The server includes a simple in-memory model registry. In a production environme
 
 To add your own models, update the `MODEL_REGISTRY` dictionary in main.py with your model configurations.
 
+## Supported Models
+
+The server supports the following Perplexity models:
+
+- `sonar` - Perplexity's flagship model with strong reasoning
+- `sonar-small` - Smaller, faster version of Sonar
+- `sonar-medium` - Medium-sized version of Sonar
+- `sonar-pro` - Pro version of Sonar with enhanced capabilities
+- `sonar-deep-research` - Specialized for in-depth research tasks
+- `sonar-reasoning-pro` - Advanced reasoning capabilities with enhanced logic
+- `codellama-70b` - Specialized for code generation
+- `mixtral-8x7b` - From Mistral AI, good for general tasks
+- `mistral-7b` - Fast and efficient model from Mistral AI
+
+To use a specific model, simply call `/v1/models/{model_id}/chat` with the model ID.
+
 ## Supported Model Parameters
 
 The chat endpoint supports the following parameters from the Perplexity API:
