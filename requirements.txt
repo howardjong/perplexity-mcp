@@ -1,0 +1,6 @@
+
+fastapi>=0.115.12
+modelcontextprotocol>=0.1.0
+pydantic>=2.11.3
+typing-extensions>=4.13.2
+uvicorn>=0.34.2
