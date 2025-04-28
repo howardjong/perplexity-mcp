@@ -143,8 +143,8 @@ async def test_api_key():
     print(f"Using Perplexity API key: {api_key[:5]}...")
     # Make an actual call to the Perplexity API
     import requests
-        
-        perplexity_url = "https://api.perplexity.ai/chat/completions"
+    
+    perplexity_url = "https://api.perplexity.ai/chat/completions"
     
     # Convert MCP messages to Perplexity format
     perplexity_messages = [
