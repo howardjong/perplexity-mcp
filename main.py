@@ -138,8 +138,9 @@ async def test_api_key():
             role=MessageRole.ASSISTANT,
             tool_calls=[]
         )
-    else:
-        print(f"Using Perplexity API key: {api_key[:5]}...")
+
+    # This is the path with the API key
+    print(f"Using Perplexity API key: {api_key[:5]}...")
         # Make an actual call to the Perplexity API
         import requests
         
