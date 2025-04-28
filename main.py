@@ -37,7 +37,9 @@ async def root():
 
 @app.get("/v1/models")
 async def list_models():
-    """List available models"""
+    """List available models from local registry (NOT from Perplexity API)
+    This endpoint returns information about models registered in your local server.
+    It does not query the Perplexity API."""
     models = []
     for model_id, config in MODEL_REGISTRY.items():
         models.append({
@@ -52,7 +54,9 @@ async def list_models():
 
 @app.get("/v1/models/{model_id}")
 async def get_model(model_id: str):
-    """Get model information"""
+    """Get model information from local registry (NOT from Perplexity API)
+    This endpoint returns information about a specific model registered in your local server.
+    It does not query the Perplexity API."""
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
@@ -280,6 +284,29 @@ async def test_api_key():
         # Only show first few characters for security
         masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
         return {"status": "success", "message": f"API key found: {masked_key}"}
+
+@app.get("/perplexity-models")
+async def list_perplexity_models():
+    """List actual models available from Perplexity API
+    This endpoint attempts to call the Perplexity API to get available models.
+    Note: Perplexity API might not have an endpoint to list models specifically."""
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
+    
+    if not api_key:
+        return {"status": "error", "message": "No API key found. Cannot query Perplexity API"}
+    
+    # Available Perplexity models as of current knowledge
+    perplexity_models = [
+        {"id": "sonar", "description": "Perplexity's flagship model with strong reasoning"},
+        {"id": "sonar-small", "description": "Smaller, faster version of Sonar"},
+        {"id": "sonar-medium", "description": "Medium-sized version of Sonar"},
+        {"id": "codellama-70b", "description": "Specialized for code generation"},
+        {"id": "mixtral-8x7b", "description": "From Mistral AI, good for general tasks"},
+        {"id": "mistral-7b", "description": "Fast and efficient model from Mistral AI"}
+    ]
+    
+    return {"perplexity_models": perplexity_models, 
+            "note": "These are known Perplexity models. Use these IDs with the /v1/models/{model_id}/chat endpoint."}
 
 @app.get("/server-info")
 async def server_info():

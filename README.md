@@ -6,11 +6,15 @@ This is a Python implementation of the Model Context Protocol (MCP) server for P
 ## Features
 
 - Implements the core MCP endpoints:
-  - `/v1/models` - List available models
-  - `/v1/models/{model_id}` - Get model information
-  - `/v1/models/{model_id}/chat` - Chat with a model
+  - `/v1/models` - List available models registered in the local MCP server
+  - `/v1/models/{model_id}` - Get model information for a locally registered model
+  - `/v1/models/{model_id}/chat` - Chat with a model - this endpoint actually calls the Perplexity API
   - `/v1/models/{model_id}/complete` - Text completion (demo implementation)
-- Includes a health check endpoint
+- Additional utility endpoints:
+  - `/perplexity-models` - Lists the known models available in the Perplexity API
+  - `/api-key-test` - Test if your Perplexity API key is properly configured
+  - `/server-info` - Get information about the server
+  - `/health` - Health check endpoint
 - Ready for deployment
 
 ## Running the Server
