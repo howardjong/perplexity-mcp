@@ -147,5 +147,27 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    import socket
+    
+    # Try to find an available port starting from 5000
     port = int(os.environ.get("PORT", 5000))
+    max_port_attempts = 10
+    
+    for attempt in range(max_port_attempts):
+        try:
+            # Try to create a socket to check if the port is available
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(('0.0.0.0', port))
+            sock.close()
+            # If we get here, the port is available
+            break
+        except socket.error:
+            print(f"Port {port} is already in use, trying {port + 1}")
+            port += 1
+            if attempt == max_port_attempts - 1:
+                print(f"Could not find an available port after {max_port_attempts} attempts")
+                import sys
+                sys.exit(1)
+    
+    print(f"Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
