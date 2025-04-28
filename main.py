@@ -131,7 +131,7 @@ async def chat(model_id: str, request: ChatRequest):
         print(f"Using Perplexity API key: {api_key[:4]}...{api_key[-4:]}")
         
         # Choose a specific Perplexity model
-        perplexity_model_name = "sonar-medium-online"  # You can change this to another model
+        perplexity_model_name = "sonar"  # You can change this to another model
         print(f"Targeting Perplexity model: {perplexity_model_name}")
         
         perplexity_url = "https://api.perplexity.ai/chat/completions"
