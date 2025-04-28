@@ -1,10 +1,16 @@
-
 import os
 import json
 from typing import Dict, List, Optional, Union, Any
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
-from modelcontextprotocol import ModelResponse, ChatMessage, ToolCall, MessageRole, ToolResult
+
+# Use local implementation instead of the problematic package
+try:
+    from modelcontextprotocol import ModelResponse, ChatMessage, ToolCall, MessageRole, ToolResult
+    print("Successfully imported modelcontextprotocol")
+except ImportError:
+    print("Using local implementation of MCP classes")
+    from local_mcp import ModelResponse, ChatMessage, ToolCall, MessageRole, ToolResult
 
 app = FastAPI(title="Perplexity MCP Server")
 
@@ -47,7 +53,7 @@ async def get_model(model_id: str):
     """Get model information"""
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
+
     config = MODEL_REGISTRY[model_id]
     return {
         "id": model_id,
@@ -77,21 +83,21 @@ async def chat(model_id: str, request: ChatRequest):
     """Chat with the model"""
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
+
     # Mock response generation
     # In a real implementation, you would call your model here with all parameters
     system_message = "I am a helpful assistant."
     user_messages = [msg for msg in request.messages if msg.role == MessageRole.USER]
-    
+
     if not user_messages:
         return ModelResponse(
             content="I don't see any user messages. How can I help you today?",
             role=MessageRole.ASSISTANT,
             tool_calls=[]
         )
-    
+
     last_user_message = user_messages[-1].content
-    
+
     # Log parameters (in a real implementation, these would be passed to the model)
     params = {
         "max_tokens": request.max_tokens,
@@ -106,10 +112,10 @@ async def chat(model_id: str, request: ChatRequest):
         "stream": request.stream
     }
     print(f"Model parameters: {params}")
-    
+
     # Simple demo response
     response = f"You said: {last_user_message}. This is a demo response from the MCP server."
-    
+
     return ModelResponse(
         content=response,
         role=MessageRole.ASSISTANT,
@@ -121,14 +127,14 @@ async def complete(model_id: str, request: Dict[str, Any]):
     """Text completion endpoint"""
     if model_id not in MODEL_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
+
     if "complete" not in MODEL_REGISTRY[model_id].capabilities:
         raise HTTPException(status_code=400, detail=f"Model {model_id} does not support completion")
-    
+
     # Mock completion implementation
     prompt = request.get("prompt", "")
     response = f"Completion for: {prompt}. This is a demo completion from the MCP server."
-    
+
     return {
         "text": response,
         "finish_reason": "stop"
